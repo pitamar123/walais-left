@@ -15,9 +15,9 @@ jobs:
           java-version: 17
       - run: mkdir -p www && cp index.html www/index.html
       - run: npm install
+      - run: npx cap add android
       - run: npm install @capacitor/assets --save-dev
       - run: npx @capacitor/assets generate --iconOnly
-      - run: npx cap add android
       - run: npx cap sync android
       - name: Build debug APK
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug
