@@ -17,7 +17,7 @@ jobs:
       - run: npm install
       - run: npx cap add android
       - run: npm install @capacitor/assets --save-dev
-      - run: npx @capacitor/assets generate --iconOnly
+      - run: npx @capacitor/assets generate
       - run: npx cap sync android
       - name: Build debug APK
         run: cd android && chmod +x gradlew && ./gradlew assembleDebug
