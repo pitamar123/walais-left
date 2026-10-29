@@ -14,8 +14,8 @@ jobs:
       - run: mkdir -p www && cp index.html www/index.html
       - run: npm install
       
-      # Install the iOS platform dependency to fix the missing platform error
-      - run: npm install @capacitor/ios
+      # FIX: Install the specific iOS platform version that matches your Capacitor Core (v6)
+      - run: npm install @capacitor/ios@6
       
       # Add and sync the iOS platform
       - run: npx cap add ios
