@@ -1,0 +1,48 @@
+name: Build Unsigned iOS IPA
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      
+      # Prepare the web assets just like your Android workflow
+      - run: mkdir -p www && cp index.html www/index.html
+      - run: npm install
+      
+      # Add and sync the iOS platform
+      - run: npx cap add ios
+      - run: npm install @capacitor/assets --save-dev
+      - run: npx @capacitor/assets generate
+      - run: npx cap sync ios
+      
+      # Build the iOS app without code signing certificates
+      - name: Build Unsigned App
+        run: |
+          cd ios/App
+          xcodebuild clean build \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath ../../build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+            
+      # Package the compiled .app file into an .ipa file
+      - name: Package into .ipa
+        run: |
+          mkdir -p Payload
+          mv build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r app.ipa Payload
+          
+      # Upload the final .ipa file to GitHub artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wallahis-left-ipa
+          path: app.ipa
