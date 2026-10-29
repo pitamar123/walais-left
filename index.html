@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-title" content="Wallahis">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b0305">
+<script>(function(){try{var d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());if(localStorage.getItem('wl_rev')===d){document.documentElement.className='pre';setTimeout(function(){document.documentElement.classList.remove('pre')},1500)}}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="assets/icon-only.png">
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -48,6 +49,8 @@ body{display:flex}
 #modal button{margin-top:12px;width:100%;padding:12px;font-size:17px;font-weight:700;border:0;border-radius:8px;background:#c8766b;color:#1a0508}
 .card.noanim .l,.card.noanim .ttl{transition:none}
 .lb:empty{display:none!important}
+.pre .card,.pre .lb{visibility:hidden}
+.lb.still{animation:none}
 </style></head><body>
 <div class="wrap">
 <div class="bar"><span id="best">🏆 BEST: -</span><span id="streak">🔥 1 day</span></div>
@@ -118,7 +121,7 @@ function resetCard(){
   $('ttl').classList.remove('on');
   var n=$('n');n.className='num hint';n.style.color='';n.textContent='?';
   $('fx').textContent='';
-  $('lb').classList.remove('show');$('inf').classList.remove('show');
+  $('lb').classList.remove('show','still');$('inf').classList.remove('show','still');
   var d=$('d');d.className='foot tap';d.textContent='TAP THE PICTURE';
 }
 function burst(){
@@ -141,6 +144,7 @@ function showFinal(v,day,animate){
   if(inf)$('ttl').classList.add('on');
   revealed=true;rolling=false;
   var d=$('d');d.className='foot';d.textContent=day;
+  if(!animate){$('lb').classList.add('still');$('inf').classList.add('still')}
   $('lb').classList.add('show');$('inf').classList.add('show');
   showStats();
   if(animate){
@@ -260,6 +264,7 @@ function render(){
   updateStats(day,v);
   onDay(day,v);
   if(done){var c=$('card');c.classList.add('noanim');showFinal(v,day,false);setTimeout(function(){c.classList.remove('noanim')},80)}
+  document.documentElement.classList.remove('pre');
 }
 render();
 setInterval(function(){if(curDay&&curDay!==israelDate())render()},30000);
