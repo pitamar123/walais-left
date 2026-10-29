@@ -46,6 +46,8 @@ body{display:flex}
 #modal p{margin:0 0 14px;font-size:14px;color:#a07a70}
 #modal input{width:100%;box-sizing:border-box;padding:12px;font-size:18px;text-align:center;border-radius:8px;border:1px solid #5a2a2f;background:#1c0a0d;color:#fff}
 #modal button{margin-top:12px;width:100%;padding:12px;font-size:17px;font-weight:700;border:0;border-radius:8px;background:#c8766b;color:#1a0508}
+.card.noanim .l,.card.noanim .ttl{transition:none}
+.lb:empty{display:none!important}
 </style></head><body>
 <div class="wrap">
 <div class="bar"><span id="best">🏆 BEST: -</span><span id="streak">🔥 1 day</span></div>
@@ -60,6 +62,7 @@ body{display:flex}
 </div>
 <div class="foot tap" id="d">TAP THE PICTURE</div>
 <div class="lb" id="lb"></div>
+<div class="lb" id="inf"></div>
 </div>
 <div id="modal"><div class="box"><h2>WHAT’S YOUR NAME?</h2><p>Shown on today’s leaderboard (max 12 characters). You only set it once.</p>
 <input id="nm" maxlength="12" autocomplete="off" placeholder="Your name"><button id="nmok">START</button></div></div>
@@ -76,8 +79,8 @@ function deviceId(){
   try{var id=localStorage.getItem('wl_id');if(!id){id=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('wl_id',id)}return id}catch(e){return Math.random().toString(36).slice(2)}
 }
 var DID=deviceId();
-// Different for each person/device, changes every day. 0..100, or 'INF' with a 1/50 chance.
-function numberFor(day){var r=mulberry(hash(DID+'|'+day));r();r();if(r()<1/50)return 'INF';return Math.floor(r()*101)}
+// Different for each person/device, changes every day. 1..100; 0 has a 1/50 chance, 'INF' a 1/100 chance.
+function numberFor(day){var r=mulberry(hash(DID+'|'+day));r();r();var x=r();if(x<0.01)return 'INF';if(x<0.03)return 0;return 1+Math.floor(r()*100)}
 function numColor(v){return 'hsl('+(v*0.6)+',100%,'+(48+v*0.14)+'%)'} // 0 = red, 100 = yellow
 function prevDay(day){var p=day.split('-');var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10)}
 function rank(v){return v==='INF'?Infinity:Number(v)}
@@ -115,7 +118,7 @@ function resetCard(){
   $('ttl').classList.remove('on');
   var n=$('n');n.className='num hint';n.style.color='';n.textContent='?';
   $('fx').textContent='';
-  $('lb').classList.remove('show');
+  $('lb').classList.remove('show');$('inf').classList.remove('show');
   var d=$('d');d.className='foot tap';d.textContent='TAP THE PICTURE';
 }
 function burst(){
@@ -129,10 +132,27 @@ function burst(){
     an.onfinish=(function(el){return function(){el.remove()}})(p);
   }
 }
+function showFinal(v,day,animate){
+  var n=$('n'),inf=(v==='INF');
+  n.classList.remove('hint');
+  if(inf){n.textContent='\u221E';n.classList.add('rainbow');n.style.color=''}
+  else{n.textContent=v;n.style.color=numColor(v)}
+  $(inf?'white':(v>50?'gold':'red')).classList.add('on');
+  if(inf)$('ttl').classList.add('on');
+  revealed=true;rolling=false;
+  var d=$('d');d.className='foot';d.textContent=day;
+  $('lb').classList.add('show');$('inf').classList.add('show');
+  showStats();
+  if(animate){
+    if(n.animate)n.animate([{transform:'scale(.4)'},{transform:'scale(1.35)'},{transform:'scale(1)'}],{duration:600,easing:'cubic-bezier(.3,1.6,.5,1)'});
+    if(inf)burst();
+  }
+}
 function reveal(){
   if(revealed||rolling||curV===null||$('modal').style.display==='flex')return;
   rolling=true;
-  var card=$('card'),n=$('n'),v=curV;
+  lsSet('wl_rev',curDay); // the animation plays only once per day
+  var card=$('card'),n=$('n'),v=curV,day=curDay;
   n.classList.remove('hint');
   if(card.animate)card.animate([{transform:'translateX(0)'},{transform:'translateX(-9px) rotate(-.6deg)'},{transform:'translateX(9px) rotate(.6deg)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:450});
   var step=0,total=18;
@@ -142,20 +162,8 @@ function reveal(){
       var r=Math.floor(Math.random()*101);
       n.textContent=r;n.style.color=numColor(r);
       setTimeout(tick,50+step*step*0.35);
-    }else land();
+    }else showFinal(v,day,true);
   })();
-  function land(){
-    var inf=(v==='INF');
-    if(inf){n.textContent='\u221E';n.classList.add('rainbow');n.style.color=''}
-    else{n.textContent=v;n.style.color=numColor(v)}
-    if(n.animate)n.animate([{transform:'scale(.4)'},{transform:'scale(1.35)'},{transform:'scale(1)'}],{duration:600,easing:'cubic-bezier(.3,1.6,.5,1)'});
-    $(inf?'white':(v>50?'gold':'red')).classList.add('on');
-    if(inf){$('ttl').classList.add('on');burst()}
-    revealed=true;rolling=false;
-    var d=$('d');d.className='foot';d.textContent=curDay;
-    $('lb').classList.add('show');
-    showStats();
-  }
 }
 $('card').addEventListener('click',reveal);
 
@@ -184,7 +192,7 @@ function syncAndShow(){
       body:JSON.stringify({day:day,device_id:DID,name:myName(),score:scoreVal(v)})})
       .then(function(r){if(r.ok||r.status===409)lsSet('wl_sub',day)}).catch(function(){});
   }
-  p.then(function(){return loadBoard(day)});
+  p.then(function(){loadInf(day);return loadBoard(day)});
 }
 function countOf(r){return parseInt((r.headers.get('content-range')||'').split('/')[1],10)||0}
 function loadBoard(day){
@@ -203,6 +211,29 @@ function myRank(day){
     return sbFetch('?day=eq.'+day+'&select=score&limit=1&or='+encodeURIComponent(f),{headers:{Prefer:'count=exact'}}).then(function(r){return countOf(r)+1});
   }).catch(function(){return null});
 }
+function loadInf(day){
+  return sbFetch('?score=eq.101&select=name,day,device_id&order=day.desc,created_at.asc&limit=1000',{headers:{Prefer:'count=exact'}})
+  .then(function(r){if(!r.ok)throw 0;var total=countOf(r);return r.json().then(function(rows){return{rows:rows,total:total}})})
+  .then(function(d){drawInf(d.rows,d.total,day)}).catch(function(){$('inf').textContent=''});
+}
+function drawInf(rows,total,day){
+  var b=$('inf');b.textContent='';
+  var h=document.createElement('h3');h.textContent='\u221E CLUB';b.appendChild(h);
+  var today=rows.filter(function(x){return x.day===day});
+  var s=document.createElement('div');s.className='note';s.style.margin='0 0 6px';
+  s.textContent=today.length?('Got \u221E today: '+today.length):'Nobody got \u221E today yet';b.appendChild(s);
+  today.slice(0,10).forEach(function(x){
+    var r=document.createElement('div');r.className='row'+(x.device_id===DID?' me':'');
+    var a=document.createElement('span');a.className='rk';a.textContent='\u221E';
+    var n=document.createElement('span');n.className='nm';n.textContent=x.name;
+    r.appendChild(a);r.appendChild(n);b.appendChild(r);
+  });
+  if(today.length>10){var m=document.createElement('div');m.className='note';m.style.margin='4px 0 0';m.textContent='+'+(today.length-10)+' more';b.appendChild(m)}
+  var ppl={};rows.forEach(function(x){ppl[x.device_id]=1});
+  var all=document.createElement('div');all.className='note';
+  all.textContent='All time: '+total+(total===1?' \u221E':' \u221E\u2019s')+' by '+Object.keys(ppl).length+(Object.keys(ppl).length===1?' person':' people');
+  b.appendChild(all);
+}
 function draw(rows,total,rk){
   var b=$('lb');b.textContent='';
   var h=document.createElement('h3');h.textContent='TODAY\u2019S TOP 10';b.appendChild(h);
@@ -218,14 +249,17 @@ function draw(rows,total,rk){
   note.textContent=rk?('You\u2019re #'+rk+' of '+total):(total+(total===1?' player':' players')+' today');
   b.appendChild(note);
 }
-setInterval(function(){if(curDay&&myName()&&lsGet('wl_sub')===curDay)loadBoard(curDay)},60000);
+setInterval(function(){if(curDay&&myName()&&lsGet('wl_sub')===curDay){loadBoard(curDay);loadInf(curDay)}},60000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&curDay&&myName())syncAndShow()});
 
 function render(){
   var day=israelDate(), v=numberFor(day);
+  var done=(lsGet('wl_rev')===day);
   resetCard();
+  if(done)revealed=true;
   updateStats(day,v);
   onDay(day,v);
+  if(done){var c=$('card');c.classList.add('noanim');showFinal(v,day,false);setTimeout(function(){c.classList.remove('noanim')},80)}
 }
 render();
 setInterval(function(){if(curDay&&curDay!==israelDate())render()},30000);
