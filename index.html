@@ -70,14 +70,11 @@ body{display:flex}
 <div class="foot tap" id="d">TAP THE PICTURE</div>
 <div class="lb" id="lb"></div>
 <div class="lb" id="inf"></div>
-<div class="foot" id="who" style="display:none"><span id="whoe"></span> · <a id="so">sign out</a></div>
+<div class="foot" id="who" style="display:none"><span id="whoe"></span> · <a id="so">switch player</a></div>
 </div>
-<div id="modal" class="ov"><div class="box"><h2>WHAT’S YOUR NAME?</h2><p>Shown on today’s leaderboard (max 12 characters). You only set it once.</p>
-<input id="nm" maxlength="12" autocomplete="off" placeholder="Your name"><button id="nmok">START</button><div class="err" id="nmerr"></div></div></div>
-<div id="login" class="ov"><div class="box"><h2>SIGN IN</h2><p id="lgmsg">Sign in with your email and a password. One account = one number per day.</p>
-<input id="em" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com">
-<input id="cd" type="password" autocomplete="current-password" placeholder="Password (6+ characters)">
-<button id="lgok">SIGN IN</button><button id="lgback" class="ghost">CREATE NEW ACCOUNT</button>
+<div id="login" class="ov"><div class="box"><h2>WALLAHIS</h2><p>Type your password to play. One player = one number per day.</p>
+<input id="cd" type="password" autocomplete="current-password" placeholder="Password">
+<button id="lgok">ENTER</button>
 <div class="err" id="lgerr"></div></div></div>
 <script>
 function $(i){return document.getElementById(i)}
@@ -93,86 +90,42 @@ function numColor(v){return 'hsl('+(v*0.6)+',100%,'+(48+v*0.14)+'%)'} // 0 = red
 function bestTxt(b){return b===null||b===undefined?'-':(b>100?'\u221E':String(b))}
 
 // ---------- state ----------
-var S=null,UID=null,curDay=null,curV=null,revealed=false,rolling=false,shownKey=null;
+var UID=null,curDay=null,curV=null,revealed=false,rolling=false,shownKey=null;
 var bestPrev=null,bestNew=null,streakCount=1;
 
-// ---------- auth (Supabase email code) ----------
-function authFetch(path,body,method,tok){
-  return fetch(URL_+path,{method:method||'POST',headers:{'Content-Type':'application/json',apikey:KEY,Authorization:'Bearer '+(tok||KEY)},body:body?JSON.stringify(body):undefined});
-}
-function saveSession(s){
-  if(!s.expires_at)s.expires_at=Math.floor(Date.now()/1000)+(s.expires_in||3600);
-  S={access_token:s.access_token,refresh_token:s.refresh_token,expires_at:s.expires_at,user:{id:s.user.id,email:s.user.email,user_metadata:s.user.user_metadata||{}}};
-  lsSet('wl_session',JSON.stringify(S));
-}
-function loadSession(){try{S=JSON.parse(lsGet('wl_session'))}catch(e){S=null}if(S&&!(S.user&&S.user.id&&S.refresh_token))S=null}
-function ensureSession(){
-  if(!S)return Promise.resolve(null);
-  if(S.expires_at-60>Date.now()/1000)return Promise.resolve(S);
-  return authFetch('/auth/v1/token?grant_type=refresh_token',{refresh_token:S.refresh_token}).then(function(r){
-    if(r.ok)return r.json().then(function(j){saveSession(j);return S});
-    if(r.status>=400&&r.status<500){S=null;lsDel('wl_session');return null}
-    throw 0;
-  });
-}
-function userName(){return S&&S.user&&S.user.user_metadata&&S.user.user_metadata.name}
-function errTxt(j){
-  var c=j&&(j.error_code||'');
-  if(c==='invalid_credentials')return 'Wrong email or password.';
-  if(c==='user_already_exists')return 'This email already has an account. Tap SIGN IN.';
-  if(c==='weak_password')return 'Password must be at least 6 characters.';
-  if(c==='email_address_invalid')return 'That email address is not valid.';
-  if(c==='over_request_rate_limit'||c==='over_email_send_rate_limit'||(j&&j.code===429))return 'Too many tries. Wait a minute and try again.';
-  return (j&&(j.msg||j.error_description||j.message))||'Something went wrong. Try again.';
-}
+// ---------- password-only sign-in (the server checks the password) ----------
+var PW=null;
 function showLogin(msg){
   document.documentElement.classList.remove('pre');
   $('cd').value='';$('lgerr').textContent=msg||'';
   $('login').style.display='flex';
 }
-function lgBusy(b){$('lgok').disabled=b;$('lgback').disabled=b}
-function doAuth(signup){
-  var err=$('lgerr');err.textContent='';
-  var em=$('em').value.trim().toLowerCase(),pw=$('cd').value;
-  if(!/^\S+@\S+\.\S+$/.test(em)){err.textContent='Enter a valid email address.';return}
-  if(pw.length<6){err.textContent='Password must be at least 6 characters.';return}
-  lgBusy(true);
-  authFetch(signup?'/auth/v1/signup':'/auth/v1/token?grant_type=password',{email:em,password:pw}).then(function(r){
-    return r.json().then(function(j){
-      if(r.ok&&j.access_token){saveSession(j);$('login').style.display='none';start()}
-      else if(r.ok)err.textContent='Account created, but email confirmation is still ON in Supabase. Turn it off (Authentication \u2192 Sign In / Providers \u2192 Email \u2192 Confirm email).';
-      else err.textContent=errTxt(j);
-    });
-  }).catch(function(){err.textContent='No connection. Try again.'}).then(function(){lgBusy(false)});
+function callPlay(pw){
+  return fetch(URL_+'/rest/v1/rpc/play',{method:'POST',headers:{'Content-Type':'application/json',apikey:KEY,Authorization:'Bearer '+KEY},body:JSON.stringify({p_password:pw})});
 }
-$('lgok').onclick=function(){doAuth(false)};
-$('lgback').onclick=function(){doAuth(true)};
-$('cd').onkeydown=$('em').onkeydown=function(e){if(e.key==='Enter')doAuth(false)};
+function accept(data,pw){
+  PW=pw;UID=data.id;
+  lsSet('wl_cache',JSON.stringify({day:data.day,pw:pw,data:data}));
+  $('whoe').textContent='Playing as '+data.name;$('who').style.display='';
+  apply(data);
+}
+function doAuth(){
+  var err=$('lgerr');err.textContent='';
+  var pw=$('cd').value.trim();
+  if(!pw){err.textContent='Enter your password.';return}
+  $('lgok').disabled=true;
+  callPlay(pw).then(function(r){
+    if(r.status===401){err.textContent='Wrong password.';return}
+    if(!r.ok){err.textContent='Something went wrong. Try again.';return}
+    return r.json().then(function(data){lsSet('wl_pw',pw);$('login').style.display='none';accept(data,pw)});
+  }).catch(function(){err.textContent='No connection. Try again.'}).then(function(){$('lgok').disabled=false});
+}
+$('lgok').onclick=doAuth;
+$('cd').onkeydown=function(e){if(e.key==='Enter')doAuth()};
 $('so').onclick=function(){
-  lsDel('wl_session');lsDel('wl_cache');S=null;UID=null;shownKey=null;curV=null;
+  lsDel('wl_pw');lsDel('wl_cache');PW=null;UID=null;shownKey=null;curV=null;
   resetCard();$('who').style.display='none';showLogin('');
 };
-
-// ---------- name (saved on the account) ----------
-function showName(){document.documentElement.classList.remove('pre');$('nmerr').textContent='';$('modal').style.display='flex'}
-function saveName(){
-  var n=$('nm').value.trim().slice(0,12);
-  if(!n)return;
-  $('nmok').disabled=true;
-  ensureSession().then(function(s){
-    if(!s)throw 'auth';
-    return authFetch('/auth/v1/user',{data:{name:n}},'PUT',s.access_token);
-  }).then(function(r){
-    if(!r.ok)throw 0;
-    S.user.user_metadata={name:n};lsSet('wl_session',JSON.stringify(S));
-    $('modal').style.display='none';start();
-  }).catch(function(e){
-    if(e==='auth'){$('modal').style.display='none';showLogin('Please sign in again.')}
-    else $('nmerr').textContent='Could not save the name. Check your connection.';
-  }).then(function(){$('nmok').disabled=false});
-}
-$('nmok').onclick=saveName;
-$('nm').onkeydown=function(e){if(e.key==='Enter')saveName()};
 
 // ---------- stats ----------
 function showStats(){
@@ -315,17 +268,13 @@ function apply(data){
   document.documentElement.classList.remove('pre');
 }
 function fetchPlay(){
-  return ensureSession().then(function(s){
-    if(!s){shownKey=null;curV=null;showLogin('Please sign in.');return}
-    return fetch(URL_+'/rest/v1/rpc/play',{method:'POST',headers:{'Content-Type':'application/json',apikey:KEY,Authorization:'Bearer '+s.access_token},body:JSON.stringify({p_name:userName()})})
-    .then(function(r){
-      if(r.status===401||r.status===403){S=null;lsDel('wl_session');showLogin('Please sign in again.');return}
-      if(!r.ok)throw 0;
-      return r.json().then(function(data){
-        lsSet('wl_cache',JSON.stringify({day:data.day,uid:UID,data:data}));
-        apply(data);
-      });
-    });
+  return callPlay(PW).then(function(r){
+    if(r.status===401){
+      lsDel('wl_pw');lsDel('wl_cache');PW=null;UID=null;shownKey=null;curV=null;
+      resetCard();$('who').style.display='none';showLogin('That password no longer works.');return;
+    }
+    if(!r.ok)throw 0;
+    return r.json().then(function(data){accept(data,PW)});
   }).catch(function(){
     if(curV===null){
       document.documentElement.classList.remove('pre');
@@ -334,18 +283,17 @@ function fetchPlay(){
   });
 }
 function start(){
-  loadSession();
-  if(!S){showLogin('');return}
-  if(!userName()){showName();return}
-  UID=S.user.id;
-  $('whoe').textContent='Signed in as '+S.user.email;$('who').style.display='';
+  PW=lsGet('wl_pw');
+  if(!PW){showLogin('');return}
   var day=israelDate(),cache=null;
   try{cache=JSON.parse(lsGet('wl_cache'))}catch(e){}
-  if(cache&&cache.day===day&&cache.uid===UID&&cache.data)apply(cache.data);
-  else{curV=null;shownKey=null;var d=$('d');d.className='foot';d.textContent='LOADING\u2026'}
+  if(cache&&cache.day===day&&cache.pw===PW&&cache.data){
+    UID=cache.data.id;$('whoe').textContent='Playing as '+cache.data.name;$('who').style.display='';
+    apply(cache.data);
+  }else{curV=null;shownKey=null;var d=$('d');d.className='foot';d.textContent='LOADING\u2026'}
   fetchPlay();
 }
 setInterval(function(){if(curDay&&UID&&curDay!==israelDate()){shownKey=null;curV=null;start()}else if(curDay&&UID&&curV!==null)loadBoard(curDay)},60000);
-document.addEventListener('visibilitychange',function(){if(document.hidden||!UID)return;if($('login').style.display==='flex'||$('modal').style.display==='flex')return;if(curDay&&curDay!==israelDate()){shownKey=null;curV=null}start()});
+document.addEventListener('visibilitychange',function(){if(document.hidden||!PW)return;if($('login').style.display==='flex')return;if(curDay&&curDay!==israelDate()){shownKey=null;curV=null}start()});
 start();
 </script></body></html>
