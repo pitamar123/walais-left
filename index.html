@@ -74,10 +74,10 @@ body{display:flex}
 </div>
 <div id="modal" class="ov"><div class="box"><h2>WHAT’S YOUR NAME?</h2><p>Shown on today’s leaderboard (max 12 characters). You only set it once.</p>
 <input id="nm" maxlength="12" autocomplete="off" placeholder="Your name"><button id="nmok">START</button><div class="err" id="nmerr"></div></div></div>
-<div id="login" class="ov"><div class="box"><h2>SIGN IN</h2><p id="lgmsg">Enter your email and we’ll send you a code. One account = one number per day.</p>
+<div id="login" class="ov"><div class="box"><h2>SIGN IN</h2><p id="lgmsg">Sign in with your email and a password. One account = one number per day.</p>
 <input id="em" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com">
-<input id="cd" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Code from the email" style="display:none">
-<button id="lgok">SEND CODE</button><button id="lgback" class="ghost" style="display:none">Use a different email</button>
+<input id="cd" type="password" autocomplete="current-password" placeholder="Password (6+ characters)">
+<button id="lgok">SIGN IN</button><button id="lgback" class="ghost">CREATE NEW ACCOUNT</button>
 <div class="err" id="lgerr"></div></div></div>
 <script>
 function $(i){return document.getElementById(i)}
@@ -117,43 +117,37 @@ function ensureSession(){
 }
 function userName(){return S&&S.user&&S.user.user_metadata&&S.user.user_metadata.name}
 function errTxt(j){
-  var c=j&&(j.error_code||j.code);
-  if(c==='over_email_send_rate_limit'||j&&j.code===429)return 'Too many emails sent. Wait a few minutes and try again.';
-  if(c==='otp_expired')return 'That code expired. Go back and request a new one.';
+  var c=j&&(j.error_code||'');
+  if(c==='invalid_credentials')return 'Wrong email or password.';
+  if(c==='user_already_exists')return 'This email already has an account. Tap SIGN IN.';
+  if(c==='weak_password')return 'Password must be at least 6 characters.';
+  if(c==='email_address_invalid')return 'That email address is not valid.';
+  if(c==='over_request_rate_limit'||c==='over_email_send_rate_limit'||(j&&j.code===429))return 'Too many tries. Wait a minute and try again.';
   return (j&&(j.msg||j.error_description||j.message))||'Something went wrong. Try again.';
 }
-var loginStep=0,loginEmail='';
 function showLogin(msg){
   document.documentElement.classList.remove('pre');
-  loginStep=0;$('em').style.display='';$('em').disabled=false;$('cd').style.display='none';$('cd').value='';
-  $('lgok').textContent='SEND CODE';$('lgback').style.display='none';$('lgerr').textContent=msg||'';
+  $('cd').value='';$('lgerr').textContent=msg||'';
   $('login').style.display='flex';
 }
-function lgBusy(b){$('lgok').disabled=b}
-$('lgok').onclick=function(){
+function lgBusy(b){$('lgok').disabled=b;$('lgback').disabled=b}
+function doAuth(signup){
   var err=$('lgerr');err.textContent='';
-  if(loginStep===0){
-    var em=$('em').value.trim().toLowerCase();
-    if(!/^\S+@\S+\.\S+$/.test(em)){err.textContent='Enter a valid email address.';return}
-    lgBusy(true);
-    authFetch('/auth/v1/otp',{email:em,create_user:true}).then(function(r){
-      if(r.ok){loginEmail=em;loginStep=1;$('em').disabled=true;$('cd').style.display='';$('cd').focus();$('lgok').textContent='VERIFY';$('lgback').style.display='';err.textContent='Code sent to '+em+'. Check your inbox (and spam).'}
-      else return r.json().then(function(j){err.textContent=errTxt(j)});
-    }).catch(function(){err.textContent='No connection. Try again.'}).then(function(){lgBusy(false)});
-  }else{
-    var tk=$('cd').value.replace(/\s/g,'');
-    if(!tk){err.textContent='Enter the code from the email.';return}
-    lgBusy(true);
-    authFetch('/auth/v1/verify',{type:'email',email:loginEmail,token:tk}).then(function(r){
-      return r.json().then(function(j){
-        if(r.ok&&j.access_token){saveSession(j);$('login').style.display='none';start()}
-        else err.textContent=errTxt(j);
-      });
-    }).catch(function(){err.textContent='No connection. Try again.'}).then(function(){lgBusy(false)});
-  }
-};
-$('lgback').onclick=function(){showLogin('')};
-$('cd').onkeydown=$('em').onkeydown=function(e){if(e.key==='Enter')$('lgok').onclick()};
+  var em=$('em').value.trim().toLowerCase(),pw=$('cd').value;
+  if(!/^\S+@\S+\.\S+$/.test(em)){err.textContent='Enter a valid email address.';return}
+  if(pw.length<6){err.textContent='Password must be at least 6 characters.';return}
+  lgBusy(true);
+  authFetch(signup?'/auth/v1/signup':'/auth/v1/token?grant_type=password',{email:em,password:pw}).then(function(r){
+    return r.json().then(function(j){
+      if(r.ok&&j.access_token){saveSession(j);$('login').style.display='none';start()}
+      else if(r.ok)err.textContent='Account created, but email confirmation is still ON in Supabase. Turn it off (Authentication \u2192 Sign In / Providers \u2192 Email \u2192 Confirm email).';
+      else err.textContent=errTxt(j);
+    });
+  }).catch(function(){err.textContent='No connection. Try again.'}).then(function(){lgBusy(false)});
+}
+$('lgok').onclick=function(){doAuth(false)};
+$('lgback').onclick=function(){doAuth(true)};
+$('cd').onkeydown=$('em').onkeydown=function(e){if(e.key==='Enter')doAuth(false)};
 $('so').onclick=function(){
   lsDel('wl_session');lsDel('wl_cache');S=null;UID=null;shownKey=null;curV=null;
   resetCard();$('who').style.display='none';showLogin('');
