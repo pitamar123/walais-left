@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-title" content="Wallahis">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0b0305">
-<script>(function(){try{var d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());if(localStorage.getItem('wl_rev')===d){document.documentElement.className='pre';setTimeout(function(){document.documentElement.classList.remove('pre')},1500)}}catch(e){}})();</script>
+<script>(function(){try{var d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());if((localStorage.getItem('wl_rev')||'').indexOf(d+'|')===0){document.documentElement.className='pre';setTimeout(function(){document.documentElement.classList.remove('pre')},1500)}}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="assets/icon-only.png">
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -41,15 +41,19 @@ body{display:flex}
 .lb .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb .sc{font-weight:700}
 .lb .note{margin-top:8px;text-align:center;font-size:13px;color:#a07a70}
-#modal{display:none;position:fixed;inset:0;z-index:10;background:rgba(5,1,2,.94);align-items:center;justify-content:center;padding:20px}
-#modal .box{width:min(90vw,360px);text-align:center;font-family:Arial,sans-serif;color:#e9c9a0}
-#modal h2{margin:0 0 6px;font:900 26px Impact,"Arial Black",Arial,sans-serif;color:#c8766b}
-#modal p{margin:0 0 14px;font-size:14px;color:#a07a70}
-#modal input{width:100%;box-sizing:border-box;padding:12px;font-size:18px;text-align:center;border-radius:8px;border:1px solid #5a2a2f;background:#1c0a0d;color:#fff}
-#modal button{margin-top:12px;width:100%;padding:12px;font-size:17px;font-weight:700;border:0;border-radius:8px;background:#c8766b;color:#1a0508}
+.ov{display:none;position:fixed;inset:0;z-index:10;background:rgba(5,1,2,.94);align-items:center;justify-content:center;padding:20px}
+.ov .box{width:min(90vw,360px);text-align:center;font-family:Arial,sans-serif;color:#e9c9a0}
+.ov h2{margin:0 0 6px;font:900 26px Impact,"Arial Black",Arial,sans-serif;color:#c8766b}
+.ov p{margin:0 0 14px;font-size:14px;color:#a07a70}
+.ov input{width:100%;box-sizing:border-box;padding:12px;font-size:18px;text-align:center;border-radius:8px;border:1px solid #5a2a2f;background:#1c0a0d;color:#fff}
+.ov button{margin-top:12px;width:100%;padding:12px;font-size:17px;font-weight:700;border:0;border-radius:8px;background:#c8766b;color:#1a0508}
 .card.noanim .l,.card.noanim .ttl{transition:none}
 .lb:empty{display:none!important}
 .pre .card,.pre .lb{visibility:hidden}
+.ov input+input{margin-top:10px}
+.ov button.ghost{background:transparent;color:#a07a70;font-size:14px;font-weight:400;margin-top:6px}
+.ov .err{min-height:18px;margin-top:10px;font-size:13px;color:#e08a7a}
+.foot a{color:#c8766b;text-decoration:underline;cursor:pointer}
 .lb.still{animation:none}
 </style></head><body>
 <div class="wrap">
@@ -66,49 +70,117 @@ body{display:flex}
 <div class="foot tap" id="d">TAP THE PICTURE</div>
 <div class="lb" id="lb"></div>
 <div class="lb" id="inf"></div>
+<div class="foot" id="who" style="display:none"><span id="whoe"></span> · <a id="so">sign out</a></div>
 </div>
-<div id="modal"><div class="box"><h2>WHAT’S YOUR NAME?</h2><p>Shown on today’s leaderboard (max 12 characters). You only set it once.</p>
-<input id="nm" maxlength="12" autocomplete="off" placeholder="Your name"><button id="nmok">START</button></div></div>
+<div id="modal" class="ov"><div class="box"><h2>WHAT’S YOUR NAME?</h2><p>Shown on today’s leaderboard (max 12 characters). You only set it once.</p>
+<input id="nm" maxlength="12" autocomplete="off" placeholder="Your name"><button id="nmok">START</button><div class="err" id="nmerr"></div></div></div>
+<div id="login" class="ov"><div class="box"><h2>SIGN IN</h2><p id="lgmsg">Enter your email and we’ll send you a code. One account = one number per day.</p>
+<input id="em" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com">
+<input id="cd" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Code from the email" style="display:none">
+<button id="lgok">SEND CODE</button><button id="lgback" class="ghost" style="display:none">Use a different email</button>
+<div class="err" id="lgerr"></div></div></div>
 <script>
 function $(i){return document.getElementById(i)}
+var URL_='https://kovigaaepgesgjmqcyke.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvdmlnYWFlcGdlc2dqbXFjeWtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMDE2ODQsImV4cCI6MjEwODc3NzY4NH0.FzeqiDSVE7NrV5QTdglGRn77spaBkBjzxFniqZ2NzCY';
 function israelDate(){
   return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 }
-function hash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
-function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-function deviceId(){
-  try{var id=localStorage.getItem('wl_id');if(!id){id=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('wl_id',id)}return id}catch(e){return Math.random().toString(36).slice(2)}
-}
-var DID=deviceId();
-// Different for each person/device, changes every day. 1..100; 0 has a 1/50 chance, 'INF' a 1/100 chance.
-function numberFor(day){var r=mulberry(hash(DID+'|'+day));r();r();var x=r();if(x<0.01)return 'INF';if(x<0.03)return 0;return 1+Math.floor(r()*100)}
+function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
 function numColor(v){return 'hsl('+(v*0.6)+',100%,'+(48+v*0.14)+'%)'} // 0 = red, 100 = yellow
-function prevDay(day){var p=day.split('-');var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10)}
-function rank(v){return v==='INF'?Infinity:Number(v)}
+function bestTxt(b){return b===null||b===undefined?'-':(b>100?'\u221E':String(b))}
 
 // ---------- state ----------
-var curDay=null,curV=null,revealed=false,rolling=false;
+var S=null,UID=null,curDay=null,curV=null,revealed=false,rolling=false,shownKey=null;
 var bestPrev=null,bestNew=null,streakCount=1;
 
-// ---------- stats (best score / streak) ----------
-function updateStats(day,v){
-  var st=null;try{st=JSON.parse(lsGet('wl_streak'))}catch(e){}
-  var count=1;
-  if(st&&st.last===day){count=st.count||1}
-  else if(st&&st.last===prevDay(day)){count=(st.count||0)+1}
-  lsSet('wl_streak',JSON.stringify({last:day,count:count}));
-  streakCount=count;
-  var best=lsGet('wl_best');
-  var bp=null;try{bp=JSON.parse(lsGet('wl_bestprev'))}catch(e){}
-  if(!bp||bp.day!==day){bp={day:day,prev:best};lsSet('wl_bestprev',JSON.stringify(bp))}
-  bestPrev=bp.prev;
-  if(best===null||rank(v)>rank(best)){best=String(v);lsSet('wl_best',best)}
-  bestNew=best;
-  showStats();
+// ---------- auth (Supabase email code) ----------
+function authFetch(path,body,method,tok){
+  return fetch(URL_+path,{method:method||'POST',headers:{'Content-Type':'application/json',apikey:KEY,Authorization:'Bearer '+(tok||KEY)},body:body?JSON.stringify(body):undefined});
 }
-function bestTxt(b){return b===null||b===undefined?'-':(b==='INF'?'\u221E':b)}
+function saveSession(s){
+  if(!s.expires_at)s.expires_at=Math.floor(Date.now()/1000)+(s.expires_in||3600);
+  S={access_token:s.access_token,refresh_token:s.refresh_token,expires_at:s.expires_at,user:{id:s.user.id,email:s.user.email,user_metadata:s.user.user_metadata||{}}};
+  lsSet('wl_session',JSON.stringify(S));
+}
+function loadSession(){try{S=JSON.parse(lsGet('wl_session'))}catch(e){S=null}if(S&&!(S.user&&S.user.id&&S.refresh_token))S=null}
+function ensureSession(){
+  if(!S)return Promise.resolve(null);
+  if(S.expires_at-60>Date.now()/1000)return Promise.resolve(S);
+  return authFetch('/auth/v1/token?grant_type=refresh_token',{refresh_token:S.refresh_token}).then(function(r){
+    if(r.ok)return r.json().then(function(j){saveSession(j);return S});
+    if(r.status>=400&&r.status<500){S=null;lsDel('wl_session');return null}
+    throw 0;
+  });
+}
+function userName(){return S&&S.user&&S.user.user_metadata&&S.user.user_metadata.name}
+function errTxt(j){
+  var c=j&&(j.error_code||j.code);
+  if(c==='over_email_send_rate_limit'||j&&j.code===429)return 'Too many emails sent. Wait a few minutes and try again.';
+  if(c==='otp_expired')return 'That code expired. Go back and request a new one.';
+  return (j&&(j.msg||j.error_description||j.message))||'Something went wrong. Try again.';
+}
+var loginStep=0,loginEmail='';
+function showLogin(msg){
+  document.documentElement.classList.remove('pre');
+  loginStep=0;$('em').style.display='';$('em').disabled=false;$('cd').style.display='none';$('cd').value='';
+  $('lgok').textContent='SEND CODE';$('lgback').style.display='none';$('lgerr').textContent=msg||'';
+  $('login').style.display='flex';
+}
+function lgBusy(b){$('lgok').disabled=b}
+$('lgok').onclick=function(){
+  var err=$('lgerr');err.textContent='';
+  if(loginStep===0){
+    var em=$('em').value.trim().toLowerCase();
+    if(!/^\S+@\S+\.\S+$/.test(em)){err.textContent='Enter a valid email address.';return}
+    lgBusy(true);
+    authFetch('/auth/v1/otp',{email:em,create_user:true}).then(function(r){
+      if(r.ok){loginEmail=em;loginStep=1;$('em').disabled=true;$('cd').style.display='';$('cd').focus();$('lgok').textContent='VERIFY';$('lgback').style.display='';err.textContent='Code sent to '+em+'. Check your inbox (and spam).'}
+      else return r.json().then(function(j){err.textContent=errTxt(j)});
+    }).catch(function(){err.textContent='No connection. Try again.'}).then(function(){lgBusy(false)});
+  }else{
+    var tk=$('cd').value.replace(/\s/g,'');
+    if(!tk){err.textContent='Enter the code from the email.';return}
+    lgBusy(true);
+    authFetch('/auth/v1/verify',{type:'email',email:loginEmail,token:tk}).then(function(r){
+      return r.json().then(function(j){
+        if(r.ok&&j.access_token){saveSession(j);$('login').style.display='none';start()}
+        else err.textContent=errTxt(j);
+      });
+    }).catch(function(){err.textContent='No connection. Try again.'}).then(function(){lgBusy(false)});
+  }
+};
+$('lgback').onclick=function(){showLogin('')};
+$('cd').onkeydown=$('em').onkeydown=function(e){if(e.key==='Enter')$('lgok').onclick()};
+$('so').onclick=function(){
+  lsDel('wl_session');lsDel('wl_cache');S=null;UID=null;shownKey=null;curV=null;
+  resetCard();$('who').style.display='none';showLogin('');
+};
+
+// ---------- name (saved on the account) ----------
+function showName(){document.documentElement.classList.remove('pre');$('nmerr').textContent='';$('modal').style.display='flex'}
+function saveName(){
+  var n=$('nm').value.trim().slice(0,12);
+  if(!n)return;
+  $('nmok').disabled=true;
+  ensureSession().then(function(s){
+    if(!s)throw 'auth';
+    return authFetch('/auth/v1/user',{data:{name:n}},'PUT',s.access_token);
+  }).then(function(r){
+    if(!r.ok)throw 0;
+    S.user.user_metadata={name:n};lsSet('wl_session',JSON.stringify(S));
+    $('modal').style.display='none';start();
+  }).catch(function(e){
+    if(e==='auth'){$('modal').style.display='none';showLogin('Please sign in again.')}
+    else $('nmerr').textContent='Could not save the name. Check your connection.';
+  }).then(function(){$('nmok').disabled=false});
+}
+$('nmok').onclick=saveName;
+$('nm').onkeydown=function(e){if(e.key==='Enter')saveName()};
+
+// ---------- stats ----------
 function showStats(){
   $('best').textContent='\uD83C\uDFC6 BEST: '+bestTxt(revealed?bestNew:bestPrev);
   $('streak').textContent='\uD83D\uDD25 '+streakCount+(streakCount===1?' day':' days');
@@ -153,9 +225,10 @@ function showFinal(v,day,animate){
   }
 }
 function reveal(){
-  if(revealed||rolling||curV===null||$('modal').style.display==='flex')return;
+  if(curV===null){if(!shownKey)start();return}
+  if(revealed||rolling)return;
   rolling=true;
-  lsSet('wl_rev',curDay); // the animation plays only once per day
+  lsSet('wl_rev',curDay+'|'+UID); // the animation plays only once per day
   var card=$('card'),n=$('n'),v=curV,day=curDay;
   n.classList.remove('hint');
   if(card.animate)card.animate([{transform:'translateX(0)'},{transform:'translateX(-9px) rotate(-.6deg)'},{transform:'translateX(9px) rotate(.6deg)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:450});
@@ -171,52 +244,29 @@ function reveal(){
 }
 $('card').addEventListener('click',reveal);
 
-// ---------- Leaderboard (Supabase) ----------
-var SB='https://kovigaaepgesgjmqcyke.supabase.co/rest/v1/scores';
-var SBKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvdmlnYWFlcGdlc2dqbXFjeWtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMDE2ODQsImV4cCI6MjEwODc3NzY4NH0.FzeqiDSVE7NrV5QTdglGRn77spaBkBjzxFniqZ2NzCY';
-function sbFetch(q,o){o=o||{};var hd={apikey:SBKEY,Authorization:'Bearer '+SBKEY};for(var k in (o.headers||{}))hd[k]=o.headers[k];o.headers=hd;return fetch(SB+q,o)}
-function myName(){return lsGet('wl_name')}
-function scoreVal(v){return v==='INF'?101:v}
+// ---------- leaderboard (reads are public) ----------
+var PL=URL_+'/rest/v1/plays';
+function sbFetch(q,o){o=o||{};var hd={apikey:KEY,Authorization:'Bearer '+KEY};for(var k in (o.headers||{}))hd[k]=o.headers[k];o.headers=hd;return fetch(PL+q,o)}
 function scoreTxt(s){return s>100?'\u221E':String(s)}
-function onDay(day,v){curDay=day;curV=v;if(myName()){syncAndShow()}else{showModal()}}
-function showModal(){$('modal').style.display='flex'}
-function saveName(){
-  var n=$('nm').value.trim().slice(0,12);
-  if(!n)return;
-  lsSet('wl_name',n);
-  $('modal').style.display='none';
-  syncAndShow();
-}
-$('nmok').onclick=saveName;
-$('nm').onkeydown=function(e){if(e.key==='Enter')saveName()};
-function syncAndShow(){
-  var day=curDay,v=curV,p=Promise.resolve();
-  if(lsGet('wl_sub')!==day){
-    p=sbFetch('',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},
-      body:JSON.stringify({day:day,device_id:DID,name:myName(),score:scoreVal(v)})})
-      .then(function(r){if(r.ok||r.status===409)lsSet('wl_sub',day)}).catch(function(){});
-  }
-  p.then(function(){loadInf(day);return loadBoard(day)});
-}
 function countOf(r){return parseInt((r.headers.get('content-range')||'').split('/')[1],10)||0}
 function loadBoard(day){
-  return sbFetch('?day=eq.'+day+'&select=name,score,device_id&order=score.desc,created_at.asc&limit=10',{headers:{Prefer:'count=exact'}})
+  return sbFetch('?day=eq.'+day+'&select=name,score,user_id&order=score.desc,created_at.asc&limit=10',{headers:{Prefer:'count=exact'}})
   .then(function(r){if(!r.ok)throw 0;var total=countOf(r);return r.json().then(function(rows){return{rows:rows,total:total}})})
   .then(function(d){
     draw(d.rows,d.total,null);
-    var mineIn=d.rows.some(function(x){return x.device_id===DID});
-    if(!mineIn&&lsGet('wl_sub')===day){return myRank(day).then(function(rk){if(rk)draw(d.rows,d.total,rk)})}
+    var mineIn=d.rows.some(function(x){return x.user_id===UID});
+    if(!mineIn){return myRank(day).then(function(rk){if(rk)draw(d.rows,d.total,rk)})}
   }).catch(function(){var b=$('lb');b.textContent='';var n=document.createElement('div');n.className='note';n.textContent='Leaderboard unavailable (no connection)';b.appendChild(n)});
 }
 function myRank(day){
-  return sbFetch('?day=eq.'+day+'&device_id=eq.'+encodeURIComponent(DID)+'&select=score,created_at').then(function(r){return r.json()}).then(function(a){
+  return sbFetch('?day=eq.'+day+'&user_id=eq.'+UID+'&select=score,created_at').then(function(r){return r.json()}).then(function(a){
     if(!a||!a[0])return null;var s=a[0].score,t=a[0].created_at;
     var f='(score.gt.'+s+',and(score.eq.'+s+',created_at.lt.'+t+'))';
     return sbFetch('?day=eq.'+day+'&select=score&limit=1&or='+encodeURIComponent(f),{headers:{Prefer:'count=exact'}}).then(function(r){return countOf(r)+1});
   }).catch(function(){return null});
 }
 function loadInf(day){
-  return sbFetch('?score=eq.101&select=name,day,device_id&order=day.desc,created_at.asc&limit=1000',{headers:{Prefer:'count=exact'}})
+  return sbFetch('?score=eq.101&select=name,day,user_id&order=day.desc,created_at.asc&limit=1000',{headers:{Prefer:'count=exact'}})
   .then(function(r){if(!r.ok)throw 0;var total=countOf(r);return r.json().then(function(rows){return{rows:rows,total:total}})})
   .then(function(d){drawInf(d.rows,d.total,day)}).catch(function(){$('inf').textContent=''});
 }
@@ -227,15 +277,16 @@ function drawInf(rows,total,day){
   var s=document.createElement('div');s.className='note';s.style.margin='0 0 6px';
   s.textContent=today.length?('Got \u221E today: '+today.length):'Nobody got \u221E today yet';b.appendChild(s);
   today.slice(0,10).forEach(function(x){
-    var r=document.createElement('div');r.className='row'+(x.device_id===DID?' me':'');
+    var r=document.createElement('div');r.className='row'+(x.user_id===UID?' me':'');
     var a=document.createElement('span');a.className='rk';a.textContent='\u221E';
     var n=document.createElement('span');n.className='nm';n.textContent=x.name;
     r.appendChild(a);r.appendChild(n);b.appendChild(r);
   });
   if(today.length>10){var m=document.createElement('div');m.className='note';m.style.margin='4px 0 0';m.textContent='+'+(today.length-10)+' more';b.appendChild(m)}
-  var ppl={};rows.forEach(function(x){ppl[x.device_id]=1});
+  var ppl={};rows.forEach(function(x){ppl[x.user_id]=1});
+  var np=Object.keys(ppl).length;
   var all=document.createElement('div');all.className='note';
-  all.textContent='All time: '+total+(total===1?' \u221E':' \u221E\u2019s')+' by '+Object.keys(ppl).length+(Object.keys(ppl).length===1?' person':' people');
+  all.textContent='All time: '+total+(total===1?' \u221E':' \u221E\u2019s')+' by '+np+(np===1?' person':' people');
   b.appendChild(all);
 }
 function draw(rows,total,rk){
@@ -243,7 +294,7 @@ function draw(rows,total,rk){
   var h=document.createElement('h3');h.textContent='TODAY\u2019S TOP 10';b.appendChild(h);
   var medals=['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
   rows.forEach(function(x,i){
-    var r=document.createElement('div');r.className='row'+(x.device_id===DID?' me':'');
+    var r=document.createElement('div');r.className='row'+(x.user_id===UID?' me':'');
     var a=document.createElement('span');a.className='rk';a.textContent=i<3?medals[i]:(i+1)+'.';
     var n=document.createElement('span');n.className='nm';n.textContent=x.name;
     var s=document.createElement('span');s.className='sc';s.textContent=scoreTxt(x.score);
@@ -253,19 +304,54 @@ function draw(rows,total,rk){
   note.textContent=rk?('You\u2019re #'+rk+' of '+total):(total+(total===1?' player':' players')+' today');
   b.appendChild(note);
 }
-setInterval(function(){if(curDay&&myName()&&lsGet('wl_sub')===curDay){loadBoard(curDay);loadInf(curDay)}},60000);
-document.addEventListener('visibilitychange',function(){if(!document.hidden&&curDay&&myName())syncAndShow()});
 
-function render(){
-  var day=israelDate(), v=numberFor(day);
-  var done=(lsGet('wl_rev')===day);
-  resetCard();
-  if(done)revealed=true;
-  updateStats(day,v);
-  onDay(day,v);
-  if(done){var c=$('card');c.classList.add('noanim');showFinal(v,day,false);setTimeout(function(){c.classList.remove('noanim')},80)}
+// ---------- today's number comes from the server (one per account per day) ----------
+function apply(data){
+  var v=data.score>100?'INF':data.score,key=data.day+'|'+UID;
+  curDay=data.day;curV=v;bestPrev=data.best_prev;bestNew=data.best;streakCount=data.streak||1;
+  if(shownKey!==key){
+    shownKey=key;
+    var done=(lsGet('wl_rev')===key);
+    resetCard();
+    if(done){revealed=true;var c=$('card');c.classList.add('noanim');showFinal(v,data.day,false);setTimeout(function(){c.classList.remove('noanim')},80)}
+    else showStats();
+    loadInf(data.day);
+  }else showStats();
+  loadBoard(data.day);
   document.documentElement.classList.remove('pre');
 }
-render();
-setInterval(function(){if(curDay&&curDay!==israelDate())render()},30000);
+function fetchPlay(){
+  return ensureSession().then(function(s){
+    if(!s){shownKey=null;curV=null;showLogin('Please sign in.');return}
+    return fetch(URL_+'/rest/v1/rpc/play',{method:'POST',headers:{'Content-Type':'application/json',apikey:KEY,Authorization:'Bearer '+s.access_token},body:JSON.stringify({p_name:userName()})})
+    .then(function(r){
+      if(r.status===401||r.status===403){S=null;lsDel('wl_session');showLogin('Please sign in again.');return}
+      if(!r.ok)throw 0;
+      return r.json().then(function(data){
+        lsSet('wl_cache',JSON.stringify({day:data.day,uid:UID,data:data}));
+        apply(data);
+      });
+    });
+  }).catch(function(){
+    if(curV===null){
+      document.documentElement.classList.remove('pre');
+      var d=$('d');d.className='foot tap';d.textContent='NO CONNECTION \u2014 TAP TO RETRY';
+    }
+  });
+}
+function start(){
+  loadSession();
+  if(!S){showLogin('');return}
+  if(!userName()){showName();return}
+  UID=S.user.id;
+  $('whoe').textContent='Signed in as '+S.user.email;$('who').style.display='';
+  var day=israelDate(),cache=null;
+  try{cache=JSON.parse(lsGet('wl_cache'))}catch(e){}
+  if(cache&&cache.day===day&&cache.uid===UID&&cache.data)apply(cache.data);
+  else{curV=null;shownKey=null;var d=$('d');d.className='foot';d.textContent='LOADING\u2026'}
+  fetchPlay();
+}
+setInterval(function(){if(curDay&&UID&&curDay!==israelDate()){shownKey=null;curV=null;start()}else if(curDay&&UID&&curV!==null)loadBoard(curDay)},60000);
+document.addEventListener('visibilitychange',function(){if(document.hidden||!UID)return;if($('login').style.display==='flex'||$('modal').style.display==='flex')return;if(curDay&&curDay!==israelDate()){shownKey=null;curV=null}start()});
+start();
 </script></body></html>
