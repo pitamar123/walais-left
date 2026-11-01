@@ -197,7 +197,7 @@ function sbFetch(q,o){o=o||{};var hd={apikey:KEY,Authorization:'Bearer '+KEY};fo
 function scoreTxt(s){return s>100?'\u221E':String(s)}
 function countOf(r){return parseInt((r.headers.get('content-range')||'').split('/')[1],10)||0}
 function loadBoard(day){
-  return sbFetch('?day=eq.'+day+'&select=name,score,user_id&order=score.desc,created_at.asc&limit=10',{headers:{Prefer:'count=exact'}})
+  return sbFetch('?day=eq.'+day+'&select=name,score,user_id&order=score.desc,created_at.asc&limit=500',{headers:{Prefer:'count=exact'}})
   .then(function(r){if(!r.ok)throw 0;var total=countOf(r);return r.json().then(function(rows){return{rows:rows,total:total}})})
   .then(function(d){
     draw(d.rows,d.total,null);
@@ -238,7 +238,7 @@ function drawInf(rows,total,day){
 }
 function draw(rows,total,rk){
   var b=$('lb');b.textContent='';
-  var h=document.createElement('h3');h.textContent='TODAY\u2019S TOP 10';b.appendChild(h);
+  var h=document.createElement('h3');h.textContent='TODAY\u2019S LEADERBOARD';b.appendChild(h);
   var medals=['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'];
   rows.forEach(function(x,i){
     var r=document.createElement('div');r.className='row'+(x.user_id===UID?' me':'');
