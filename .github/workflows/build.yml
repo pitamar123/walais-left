@@ -16,6 +16,9 @@ jobs:
       - run: mkdir -p www && cp index.html www/index.html
       - run: npm install
       - run: npx cap add android
+      - name: Allow vibration
+        run: |
+          sed -i 's|<application|<uses-permission android:name="android.permission.VIBRATE" />\n    <application|' android/app/src/main/AndroidManifest.xml
       - run: npm install @capacitor/assets --save-dev
       - run: npx @capacitor/assets generate
       - run: npx cap sync android
