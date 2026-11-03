@@ -55,6 +55,14 @@ body{display:flex}
 .ov .err{min-height:18px;margin-top:10px;font-size:13px;color:#e08a7a}
 .foot a{color:#c8766b;text-decoration:underline;cursor:pointer}
 .lb.still{animation:none}
+.cap{position:absolute;left:0;right:0;bottom:4%;font-size:8cqw;line-height:1.1;font-weight:900;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000,0 0 10px #000;opacity:0;transition:opacity .6s;pointer-events:none}
+.cap.on{opacity:1}
+#flash{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;opacity:0}
+.sharebtn{display:none;margin:12px auto 0;padding:11px 22px;font:700 15px Arial,sans-serif;letter-spacing:.04em;border:0;border-radius:24px;background:#25d366;color:#052e16}
+.sharebtn.show{display:block}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;text-align:center}
+.stats b{display:block;font-size:20px;color:#fff}
+.stats span{font-size:12px;color:#a07a70}
 </style></head><body>
 <div class="wrap">
 <div class="bar"><span id="best">🏆 BEST: -</span><span id="streak">🔥 1 day</span></div>
@@ -66,10 +74,14 @@ body{display:flex}
 <div class="ttl" id="ttl">WALLAHIS LEFT:</div>
 <div class="num hint" id="n">?</div>
 <div id="fx"></div>
+<div id="flash"></div>
+<div class="cap" id="cap"></div>
 </div>
 <div class="foot tap" id="d">TAP THE PICTURE</div>
+<button id="share" class="sharebtn">SHARE ON WHATSAPP</button>
 <div class="lb" id="lb"></div>
 <div class="lb" id="inf"></div>
+<div class="lb" id="me"></div>
 <div class="foot" id="who" style="display:none"><span id="whoe"></span> · <a id="so">switch player</a></div>
 </div>
 <div id="login" class="ov"><div class="box"><h2>WALLAHIS</h2><p>Type your password to play. One player = one number per day.</p>
@@ -140,12 +152,14 @@ function resetCard(){
   $('ttl').classList.remove('on');
   var n=$('n');n.className='num hint';n.style.color='';n.textContent='?';
   $('fx').textContent='';
-  $('lb').classList.remove('show','still');$('inf').classList.remove('show','still');
+  ['lb','inf','me'].forEach(function(i){$(i).classList.remove('show','still')});
+  $('cap').classList.remove('on');$('cap').textContent='';$('share').classList.remove('show');
   var d=$('d');d.className='foot tap';d.textContent='TAP THE PICTURE';
 }
-function burst(){
-  var fx=$('fx'),W=fx.clientWidth,H=fx.clientHeight,cols=['#ff3b30','#ff9500','#ffd60a','#34c759','#0a84ff','#bf5af2','#ff2d95'];
-  for(var i=0;i<36;i++){
+function burst(n,cols){
+  cols=cols||['#ff3b30','#ff9500','#ffd60a','#34c759','#0a84ff','#bf5af2','#ff2d95'];
+  var fx=$('fx'),W=fx.clientWidth,H=fx.clientHeight;
+  for(var i=0;i<(n||36);i++){
     var p=document.createElement('i');p.style.background=cols[i%cols.length];
     p.style.left=(W/2)+'px';p.style.top=(H*0.2)+'px';fx.appendChild(p);
     var a=Math.random()*Math.PI*2,s=80+Math.random()*(W*0.5);
@@ -154,6 +168,9 @@ function burst(){
     an.onfinish=(function(el){return function(){el.remove()}})(p);
   }
 }
+function vib(p){try{if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
+function flashScreen(color){var f=$('flash');f.style.background=color;if(f.animate)f.animate([{opacity:.85},{opacity:0}],{duration:900,easing:'ease-out'})}
+function capFor(v){return v==='INF'?'INFINITY \uD83C\uDF08':v===0?'ZERO \uD83D\uDC80':v===100?'PERFECT 100 \uD83D\uDD25':''}
 function showFinal(v,day,animate){
   var n=$('n'),inf=(v==='INF');
   n.classList.remove('hint');
@@ -161,14 +178,22 @@ function showFinal(v,day,animate){
   else{n.textContent=v;n.style.color=numColor(v)}
   $(inf?'white':(v>50?'gold':'red')).classList.add('on');
   if(inf)$('ttl').classList.add('on');
+  var cp=capFor(v),cap=$('cap');cap.textContent=cp;if(cp)cap.classList.add('on');
   revealed=true;rolling=false;
   var d=$('d');d.className='foot';d.textContent=day;
-  if(!animate){$('lb').classList.add('still');$('inf').classList.add('still')}
-  $('lb').classList.add('show');$('inf').classList.add('show');
+  var boxes=['lb','inf','me'];
+  boxes.forEach(function(i){if(!animate)$(i).classList.add('still');$(i).classList.add('show')});
+  $('share').classList.add('show');
   showStats();
   if(animate){
     if(n.animate)n.animate([{transform:'scale(.4)'},{transform:'scale(1.35)'},{transform:'scale(1)'}],{duration:600,easing:'cubic-bezier(.3,1.6,.5,1)'});
-    if(inf)burst();
+    if(inf){burst(90);flashScreen('#ffffff');vib([80,40,80,40,80,40,300])}
+    else if(v===0){
+      flashScreen('#b00020');vib([250,80,250]);
+      var c=$('card');if(c.animate)c.animate([{transform:'translateX(0)'},{transform:'translateX(-16px) rotate(-1.5deg)'},{transform:'translateX(16px) rotate(1.5deg)'},{transform:'translateX(-12px)'},{transform:'translateX(12px)'},{transform:'translateX(-6px)'},{transform:'translateX(0)'}],{duration:800});
+    }
+    else if(v===100){burst(60,['#ffd60a','#ffb300','#fff3b0','#ffffff']);flashScreen('#ffd60a');vib([60,40,60,40,220])}
+    else vib(60);
   }
 }
 function reveal(){
@@ -185,6 +210,7 @@ function reveal(){
     if(step<total){
       var r=Math.floor(Math.random()*101);
       n.textContent=r;n.style.color=numColor(r);
+      if(step%2===0)vib(10);
       setTimeout(tick,50+step*step*0.35);
     }else showFinal(v,day,true);
   })();
@@ -252,6 +278,42 @@ function draw(rows,total,rk){
   b.appendChild(note);
 }
 
+function loadMe(){
+  return sbFetch('?user_id=eq.'+UID+'&select=score&limit=1000').then(function(r){if(!r.ok)throw 0;return r.json()}).then(drawMe).catch(function(){$('me').textContent=''});
+}
+function drawMe(rows){
+  var b=$('me');b.textContent='';
+  var h=document.createElement('h3');h.textContent='YOUR LUCK';b.appendChild(h);
+  var nums=rows.filter(function(x){return x.score<=100}).map(function(x){return x.score});
+  var avg=nums.length?(nums.reduce(function(a,c){return a+c},0)/nums.length).toFixed(1):'-';
+  var cells=[
+    [rows.length,'days played'],
+    [avg,'average'],
+    [rows.filter(function(x){return x.score===0}).length+' \uD83D\uDC80','zeros'],
+    [rows.filter(function(x){return x.score===100}).length+' \uD83D\uDCAF','hundreds'],
+    [rows.filter(function(x){return x.score>100}).length+' \u221E','infinities'],
+    [streakCount+' \uD83D\uDD25','day streak']
+  ];
+  var g=document.createElement('div');g.className='stats';
+  cells.forEach(function(c){var d=document.createElement('div'),v=document.createElement('b'),l=document.createElement('span');v.textContent=c[0];l.textContent=c[1];d.appendChild(v);d.appendChild(l);g.appendChild(d)});
+  b.appendChild(g);
+}
+var PAGE_URL='https://pitamar123.github.io/walais-left/';
+function shareText(){
+  var v=curV,t;
+  if(v==='INF')t='\u221E WALLAHIS LEFT: INFINITY!! \uD83C\uDF08\uD83D\uDC15 I got \u221E today!';
+  else if(v===0)t='\uD83D\uDC80 WALLAHIS LEFT: 0. I have no wallahis left today.';
+  else if(v===100)t='\uD83D\uDD25 WALLAHIS LEFT: 100!! Perfect score \uD83D\uDC15';
+  else t='\uD83D\uDC15 WALLAHIS LEFT: '+v+' today!';
+  if(streakCount>1)t+=' \uD83D\uDD25 '+streakCount+' days in a row';
+  return t+'\n'+PAGE_URL;
+}
+$('share').onclick=function(){
+  var t=shareText();
+  if(navigator.share){navigator.share({text:t}).catch(function(){});return}
+  window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+};
+
 // ---------- today's number comes from the server (one per account per day) ----------
 function apply(data){
   var v=data.score>100?'INF':data.score,key=data.day+'|'+UID;
@@ -262,7 +324,7 @@ function apply(data){
     resetCard();
     if(done){revealed=true;var c=$('card');c.classList.add('noanim');showFinal(v,data.day,false);setTimeout(function(){c.classList.remove('noanim')},80)}
     else showStats();
-    loadInf(data.day);
+    loadInf(data.day);loadMe();
   }else showStats();
   loadBoard(data.day);
   document.documentElement.classList.remove('pre');
