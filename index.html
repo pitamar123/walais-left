@@ -116,9 +116,9 @@ function doAuth(){
   $('lgok').disabled=true;
   callPlay(pw).then(function(r){
     if(r.status===401){err.textContent='Wrong password.';return}
-    if(!r.ok){err.textContent='Something went wrong. Try again.';return}
+    if(!r.ok){err.textContent='Server error '+r.status+'. Try again.';return}
     return r.json().then(function(data){lsSet('wl_pw',pw);$('login').style.display='none';accept(data,pw)});
-  }).catch(function(){err.textContent='No connection. Try again.'}).then(function(){$('lgok').disabled=false});
+  }).catch(function(e){err.textContent='No connection ('+((e&&e.message)||'error')+'). Try again.'}).then(function(){$('lgok').disabled=false});
 }
 $('lgok').onclick=doAuth;
 $('cd').onkeydown=function(e){if(e.key==='Enter')doAuth()};
@@ -273,12 +273,12 @@ function fetchPlay(){
       lsDel('wl_pw');lsDel('wl_cache');PW=null;UID=null;shownKey=null;curV=null;
       resetCard();$('who').style.display='none';showLogin('That password no longer works.');return;
     }
-    if(!r.ok)throw 0;
+    if(!r.ok)throw new Error('server '+r.status);
     return r.json().then(function(data){accept(data,PW)});
-  }).catch(function(){
+  }).catch(function(e){
     if(curV===null){
       document.documentElement.classList.remove('pre');
-      var d=$('d');d.className='foot tap';d.textContent='NO CONNECTION \u2014 TAP TO RETRY';
+      var d=$('d');d.className='foot tap';d.textContent='NO CONNECTION ('+((e&&e.message)||'error')+') \u2014 TAP TO RETRY';
     }
   });
 }
